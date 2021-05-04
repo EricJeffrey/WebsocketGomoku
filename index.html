@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+    <script src="pixi.js"></script>
+    <style>
+        * {
+            padding: 0;
+            margin: 0;
+            /* background: #ccb97b; */
+        }
+    </style>
+</head>
+
+<body>
+    <script>
+
+        var board = {
+            pieceType: {
+                EMPTY: -1,
+                BLACK: 0,
+                WHITE: 1
+            },
+
+            rowSize: 8,
+            colSize: 8,
+            grid: [],
+            flatRows: [],
+
+            init: function () {
+                for (let i = 0; i < this.rowSize; i++) {
+                    this.grid.push([]);
+                    for (let j = 0; j < this.rowSize; j++)
+                        this.grid[i].push(this.pieceType.EMPTY);
+                }
+                this.flatten();
+            },
+
+            putPiece: function (rowI, colJ, type) {
+                this.grid[rowI][colJ] = type;
+                this.flatRows[rowI][colJ] = type;
+                this.flatRows[this.rowSize + colJ][rowI] = type;
+                let base = this.rowSize + this.colSize;
+                // left -> up right
+                let tmp1 = Math.min(this.rowSize - rowI - 1, colJ);
+                if (colJ - tmp1 == 0) {
+                    this.flatRows[base + rowI + tmp1][colJ] = type;
+                } else {
+                    this.flatRows[base + this.rowSize + (colJ - tmp1 - 1)][tmp1] = type;
+                }
+                // left -> down right
+                base += this.rowSize + this.colSize - 1;
+                tmp1 = Math.min(rowI, colJ);
+                if (rowI >= colJ) {
+                    this.flatRows[base + rowI - tmp1][colJ] = type;
+                } else {
+                    this.flatRows[base + this.rowSize + colJ - tmp1 - 1][tmp1] = type;
+                }
+
+            },
+            unPutPiece: function (rowI, colJ) {
+                this.putPiece(rowI, colJ, this.pieceType.EMPTY);
+            },
+            isEmpty: function (rowI, colJ) {
+                return this.grid[rowI][colJ] == this.pieceType.EMPTY;
+            },
+
+            flatten: function () {
+                if (this.flatRows.length != 0)
+                    return this.flatRows;
+                let rows = [];
+                for (let i = 0; i < this.rowSize; i++) {
+                    let tmpRow = [];
+                    for (let j = 0; j < this.colSize; j++)
+                        tmpRow.push(this.grid[i][j]);
+                    rows.push(tmpRow);
+                }
+                for (let j = 0; j < this.colSize; j++) {
+                    let tmpRow = [];
+                    for (let i = 0; i < this.rowSize; i++) {
+                        tmpRow.push(this.grid[i][j]);
+                    }
+                    rows.push(tmpRow);
+                }
+                for (let i = 0; i < this.rowSize; i++) {
+                    let tmpRow = [];
+                    let tmpI = i;
+                    let tmpJ = 0;
+                    while (tmpI >= 0 && tmpJ < this.colSize) {
+                        tmpRow.push(this.grid[tmpI][tmpJ]);
+                        tmpI--;
+                        tmpJ++;
+                    }
+                    rows.push(tmpRow);
+                }
+                for (let i = 1; i < this.colSize; i++) {
+                    let tmpRow = [];
+                    let tmpI = this.rowSize - 1, tmpJ = i;
+                    while (tmpI >= 0 && tmpJ < this.colSize) {
+                        tmpRow.push(this.grid[tmpI][tmpJ]);
+                        tmpI--;
+                        tmpJ++;
+                    }
+                    rows.push(tmpRow);
+                }
+                for (let i = 0; i < this.rowSize; i++) {
+                    let tmpRow = [];
+                    let tmpI = i, tmpJ = 0;
+                    while (tmpI < this.rowSize && tmpJ < this.colSize) {
+                        tmpRow.push(this.grid[tmpI][tmpJ]);
+                        tmpI++;
+                        tmpJ++;
+                    }
+                    rows.push(tmpRow);
+                }
+                for (let i = 1; i < this.colSize; i++) {
+                    let tmpRow = [];
+                    let tmpI = 0, tmpJ = i;
+                    while (tmpI < this.rowSize && tmpJ < this.colSize) {
+                        tmpRow.push(this.grid[tmpI][tmpJ]);
+                        tmpI++;
+                        tmpJ++;
+                    }
+                    rows.push(tmpRow);
+                }
+                this.flatRows = rows;
+                return this.flatRows;
+            },
+
+            scoreOfRow: function (row, colorType) {
+                let findFirstOf = (row, from, end, predict) => {
+                    for (let i = from; i < end; i++)
+                        if (predict(row[i]))
+                            return i;
+                    return -1;
+                };
+                let score = 0;
+                let start = 0;
+                while (start < row.length) {
+                    let tmpLeft = findFirstOf(row, start, row.length, (v) => v == colorType);
+                    if (tmpLeft == -1)
+                        break;
+                    let tmpRight = findFirstOf(row, start + 1, row.length, (v) => v != colorType);
+                    if (tmpRight == -1)
+                        tmpRight = row.length;
+                    let n = tmpRight - tmpLeft;
+                    let leftI = tmpLeft - 1;
+                    let rightI = tmpRight;
+                    if (n >= 5)
+                        score += 100000;
+                    else if (n == 4) {
+                        if (leftI >= start && row[leftI] == this.pieceType.EMPTY || rightI < row.length && row[rightI] == this.pieceType.EMPTY)
+                            score += 10000;
+                    }
+                    else if (n <= 3 && n >= 1) {
+                        if (leftI >= start && row[leftI] == this.pieceType.EMPTY && rightI < row.length && row[rightI] == this.pieceType.EMPTY)
+                            score += Math.pow(10, n);
+                        else if (leftI >= start && row[leftI] == this.pieceType.EMPTY || rightI < row.length && row[rightI] == this.pieceType.EMPTY)
+                            score += Math.pow(10, n - 1);
+                    }
+                    start = tmpRight;
+                }
+                return score;
+            },
+            calculateScore: function (pieceType) {
+                let rows = this.flatten();
+                let score = 0;
+                for (let i = 0; i < rows.length; i++) {
+                    const row = rows[i];
+                    let tmpScore = this.scoreOfRow(row, pieceType == this.pieceType.WHITE ? this.pieceType.BLACK : this.pieceType.WHITE);
+                    if (tmpScore >= 100000)
+                        return -tmpScore;
+                    score -= tmpScore + 1;
+                    tmpScore = this.scoreOfRow(row, pieceType);
+                    if (tmpScore >= 100000)
+                        return tmpScore;
+                    score += tmpScore;
+                }
+                return score;
+            }
+        };
+    </script>
+    <script>
+        var game = {
+            humanPieceType: board.pieceType.WHITE,
+            machinePieceType: board.pieceType.BLACK,
+            pieceTypeToColor: function (type) {
+                if (type == board.pieceType.WHITE)
+                    return 0xffffff;
+                if (type == board.pieceType.BLACK)
+                    return 0;
+                return 0x333333;
+            }
+        };
+
+        var boardPainter = {
+            rowHeight: 50,
+            colWidth: 50,
+            boardBgColor: 0xccb97b,
+            gridLineColor: 0x008888,
+            gridLineWidth: 2,
+            boardX: 10,
+            boardY: 10,
+            boardRect: null,
+            mPixiApp: null,
+
+            init: function (pixiApp) {
+                this.mPixiApp = app;
+            },
+            drawBoard: function (board) {
+                let rectangle = new PIXI.Graphics();
+                rectangle.interactive = true;
+
+                const boardHeight = (board.rowSize) * this.gridLineWidth + board.rowSize * this.rowHeight;
+                const boardWidth = (board.colSize) * this.gridLineWidth + board.colSize * this.colWidth;
+                rectangle.beginFill(this.boardBgColor);
+                rectangle.drawRect(0, 0, boardWidth, boardHeight);
+                rectangle.endFill();
+                rectangle.x = this.boardX;
+                rectangle.y = this.boardY;
+                this.boardRect = rectangle;
+                app.stage.addChild(rectangle);
+
+                for (let i = 0; i < board.rowSize + 1; i++) {
+                    let tmpLine = new PIXI.Graphics();
+                    tmpLine.lineStyle(this.gridLineWidth, this.gridLineColor, 1);
+                    tmpLine.moveTo(0, 0);
+                    tmpLine.lineTo(boardWidth, 0);
+                    tmpLine.x = this.boardX;
+                    tmpLine.y = this.boardY + (i * (this.rowHeight + this.gridLineWidth));
+                    app.stage.addChild(tmpLine);
+                }
+                for (let i = 0; i < board.colSize + 1; i++) {
+                    let tmpLine = new PIXI.Graphics();
+                    tmpLine.lineStyle(this.gridLineWidth, this.gridLineColor, 1);
+                    tmpLine.moveTo(0, 0);
+                    tmpLine.lineTo(0, boardHeight);
+                    tmpLine.x = this.boardX + (i * (this.colWidth + this.gridLineWidth));
+                    tmpLine.y = this.boardY;
+                    app.stage.addChild(tmpLine);
+                }
+            },
+            drawPiece: function (row, col, color) {
+                let ellipse = new PIXI.Graphics();
+                ellipse.beginFill(color);
+                ellipse.drawEllipse(0, 0, this.colWidth / 2, this.rowHeight / 2);
+                ellipse.endFill();
+                ellipse.x = this.boardY + col * (this.colWidth + this.gridLineWidth) + this.colWidth / 2;
+                ellipse.y = this.boardX + row * (this.rowHeight + this.gridLineWidth) + this.rowHeight / 2;
+                app.stage.addChild(ellipse);
+            },
+            eventPosToRowCol: function (x, y) {
+                x -= this.boardX;
+                y -= this.boardY;
+                let res = {
+                    row: -1,
+                    col: -1
+                }
+                if (x % (this.colWidth + this.gridLineWidth) <= this.gridLineWidth) {
+                    return res;
+                }
+                if (y % (this.rowHeight + this.gridLineWidth) <= this.gridLineWidth) {
+                    return res;
+                }
+                res.row = Math.floor(y / (this.rowHeight + this.gridLineWidth));
+                res.col = Math.floor(x / (this.colWidth + this.gridLineWidth));
+                return res;
+            }
+        };
+
+        // 复杂度太高
+        var minMax = {
+            maxStep: 4,
+            counter: 0,
+            search: function (board, step, isPieceBlack, isMax, alpha, beta) {
+                if (step >= this.maxStep) {
+                    let tmpScore = board.calculateScore(game.machinePieceType);
+                    return { score: tmpScore, pos: null };
+                }
+                let posAvailable = [];
+                for (let i = 0; i < board.rowSize; i++) {
+                    for (let j = 0; j < board.colSize; j++) {
+                        if (board.isEmpty(i, j))
+                            posAvailable.push({ row: i, col: j });
+                    }
+                }
+                let scoreList = [];
+                let posList = [];
+                for (let i = 0; i < posAvailable.length; i++) {
+                    const pos = posAvailable[i];
+                    board.putPiece(pos.row, pos.col, isPieceBlack ? board.pieceType.BLACK : board.pieceType.WHITE);
+                    let tmpRes = this.search(board, step + 1, !isPieceBlack, !isMax, alpha, beta);
+                    if (tmpRes.score != null) {
+                        scoreList.push(tmpRes.score);
+                        posList.push(pos);
+                        if (isMax)
+                            alpha = Math.max(alpha, tmpRes.score);
+                        else
+                            beta = Math.min(beta, tmpRes.score);
+                    }
+                    board.unPutPiece(pos.row, pos.col);
+                    if (alpha >= beta)
+                        break;
+                }
+                if (scoreList.length == 0)
+                    return { score: null, pos: null };
+                let targetIndex = 0;
+                for (let i = 0; i < scoreList.length; i++) {
+                    if (isMax && scoreList[i] > scoreList[targetIndex] || !isMax && scoreList[i] < scoreList[targetIndex]) {
+                        targetIndex = i;
+                    }
+                }
+                return { score: scoreList[targetIndex], pos: posList[targetIndex] };
+            }
+        };
+
+        let app = new PIXI.Application({ width: 800, height: 600, antialias: true });
+        document.body.appendChild(app.view);
+        app.renderer.backgroundColor = 0xffffff;
+        // app.renderer.view.style.position = "absolute";
+        // app.renderer.view.style.display = "block";
+        // app.renderer.autoResize = true;
+        // app.renderer.resize(window.innerWidth, window.innerHeight);
+
+        let btn = document.createElement("button");
+        btn.innerText = "minMax";
+        document.body.appendChild(btn);
+        let tmpDiv = document.createElement("div");
+        document.body.appendChild(tmpDiv);
+        btn.onclick = function (ev) {
+            tmpDiv.innerText = "searching";
+            setTimeout(() => {
+                let tmpRes = minMax.search(board, 0, true, true, -99999999, 99999999);
+                tmpDiv.innerText = JSON.stringify(tmpRes);
+                let nextPos = tmpRes.pos;
+                board.putPiece(nextPos.row, nextPos.col, game.machinePieceType);
+                boardPainter.drawPiece(nextPos.row, nextPos.col, game.machinePieceType);
+            }, 100);
+        }
+
+        board.init();
+        boardPainter.init(app);
+
+        boardPainter.drawBoard(board);
+
+        boardPainter.boardRect.click = function (ev) {
+            let x = ev.data.global.x;
+            let y = ev.data.global.y;
+            let pos = boardPainter.eventPosToRowCol(x, y);
+            if (pos.row !== -1 && board.isEmpty(pos.row, pos.col)) {
+                board.putPiece(pos.row, pos.col, game.humanPieceType);
+                boardPainter.drawPiece(pos.row, pos.col, game.pieceTypeToColor(game.humanPieceType));
+            }
+        }
+
+        // for (let i = 0; i < board.rowSize; i++) {
+        //     for (let j = 0; j < board.colSize; j++) {
+        //         setTimeout(() => {
+        //             let rand = Math.random();
+        //             board.putPiece(i, j, rand > 0.5 ? board.pieceType.WHITE : board.pieceType.BLACK);
+        //             boardPainter.drawPiece(i, j, rand > 0.5 ? 0xffffff : 0x000000);
+        //         }, 5 * (i * board.colSize + j));
+        //     }
+        // }
+        // console.log(board.flatten());
+
+    </script>
+</body>
+
+</html>

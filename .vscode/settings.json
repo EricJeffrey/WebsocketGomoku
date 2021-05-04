@@ -1,0 +1,8 @@
+{
+    "cSpell.words": [
+        "PIXI"
+    ],
+    "todo-tree.filtering.excludeGlobs": [
+        "**/pixi.js*"
+    ]
+}
