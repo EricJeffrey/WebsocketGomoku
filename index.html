@@ -41,24 +41,114 @@
             },
 
             putPiece: function (rowI, colJ, type) {
+                let doPut = type != this.pieceType.EMPTY;
+                let oldType = this.grid[rowI][colJ];
+                // not working
+                let updateScoreOfRow = (row, targetPos, isPut, oldType) => {
+                    let side = (targetPos, isLeft) => {
+                        let isBorderEmpty = false;
+                        let numAffect = 0;
+                        let type = null;
+                        // not at border
+                        if (isLeft && targetPos > 0 || !isLeft && targetPos < row.length - 1) {
+                            let tmpTargetPos = targetPos + isLeft ? -1 : 1;
+                            type = row[tmpTargetPos];
+                            if (type != board.pieceType.EMPTY) {
+                                // find same
+                                let sideNotSamePos = tmpTargetPos;
+                                while (sideNotSamePos >= 0 && sideNotSamePos < row.length && row[sideNotSamePos] == row[tmpTargetPos]) {
+                                    sideNotSamePos += isLeft ? -1 : 1;
+                                }
+                                numAffect = Math.abs(tmpTargetPos - sideNotSamePos);
+                            }
+                        }
+                        return { n: numAffect, isBorderEmpty: isBorderEmpty, type: type };
+                    };
+                    let scoreOfN = (n, leftEmpty, rightEmpty) => {
+                        let score = 0;
+                        if (n >= 5) {
+                            score = 100000;
+                        } else if (n >= 1) {
+                            if (leftEmpty && rightEmpty)
+                                score = Math.pow(10, n);
+                            else if (leftEmpty || rightEmpty)
+                                score = Map.pow(10, n - 1);
+                        }
+                        return score;
+                    };
+                    let leftSide = side(row, targetPos);
+                    let rightSide = side(row, targetPos);
+                    if (isPut) {
+                        let leftScore = scoreOfN(leftSide.n, leftSide.isBorderEmpty, true);
+                        let rightScore = scoreOfN(rightSide.n, true, rightSide.isBorderEmpty);
+                        let newN = 1;
+                        let leftEmpty = leftSide.type == board.pieceType.EMPTY;
+                        let rightEmpty = rightSide.type == board.pieceType.EMPTY;
+                        let newScore = 0;
+                        if (row[targetPos] == leftSide.type) {
+                            newN += leftSide.n;
+                            leftEmpty = leftSide.isBorderEmpty;
+                        } else {
+                            newScore += scoreOfN(leftSide.n, leftSide.isBorderEmpty, false);
+                        }
+                        if (row[targetPos] == rightSide.type) {
+                            newN += rightSide.n;
+                            rightEmpty = rightSide.isBorderEmpty;
+                        } else {
+                            newScore += scoreOfN(rightSide.n, false, rightSide.isBorderEmpty);
+                        }
+                        newScore += scoreOfN(newN, leftEmpty, rightEmpty);
+                        this.score = this.score - leftScore - rightScore + newScore;
+                    }
+                    else {
+                        // unput
+                        let oldSideScore = 0;
+                        let oldN = 1;
+                        let oldLeftEmpty = leftSide.type == board.pieceType.EMPTY;
+                        let oldRightEmpty = rightSide.type == board.pieceType.EMPTY;
+                        if (leftSide.type == oldType) {
+                            oldN += leftSide.n;
+                            oldLeftEmpty = leftSide.isBorderEmpty;
+                        } else {
+                            oldSideScore += scoreOfN(leftSide.n, leftSide.isBorderEmpty, false);
+                        }
+                        if (rightSide.type == oldType) {
+                            oldN += rightSide.n;
+                            oldRightEmpty = rightSide.isBorderEmpty;
+                        } else {
+                            oldSideScore += scoreOfN(rightSide.n, false, rightSide.isBorderEmpty);
+                        }
+                        let oldScore = scoreOfN(oldN, oldLeftEmpty, oldRightEmpty) + oldSideScore;
+                        let newLeftScore = scoreOfN(leftSide.n, leftSide.isBorderEmpty, true);
+                        let newRightScore = scoreOfN(rightSide.n, true, rightSide.isBorderEmpty);
+                        this.score = this.score - oldScore + newLeftScore + newRightScore;
+                    }
+                };
+
                 this.grid[rowI][colJ] = type;
                 this.flatRows[rowI][colJ] = type;
+                // updateScoreOfRow(this.flatRows[rowI], colJ, this.score, doPut, oldType);
                 this.flatRows[this.rowSize + colJ][rowI] = type;
+                // updateScoreOfRow(this.flatRows[this.rowSize + colJ], rowI, doPut, oldType);
                 let base = this.rowSize + this.colSize;
                 // left -> up right
                 let tmp1 = Math.min(this.rowSize - rowI - 1, colJ);
                 if (colJ - tmp1 == 0) {
                     this.flatRows[base + rowI + tmp1][colJ] = type;
+                    // updateScoreOfRow(this.flatRows[base + rowI + tmp1], colJ, doPut, oldType);
                 } else {
                     this.flatRows[base + this.rowSize + (colJ - tmp1 - 1)][tmp1] = type;
+                    // updateScoreOfRow(this.flatRows[base + this.rowSize + (colJ - tmp1 - 1)], tmp1, doPut, oldType);
                 }
                 // left -> down right
                 base += this.rowSize + this.colSize - 1;
                 tmp1 = Math.min(rowI, colJ);
                 if (rowI >= colJ) {
                     this.flatRows[base + rowI - tmp1][colJ] = type;
+                    // updateScoreOfRow(this.flatRows[base + rowI - tmp1], colJ, doPut, oldType);
                 } else {
                     this.flatRows[base + this.rowSize + colJ - tmp1 - 1][tmp1] = type;
+                    // updateScoreOfRow(this.flatRows[base + this.rowSize + colJ - tmp1 - 1], tmp1, doPut, oldType);
                 }
 
             },
@@ -318,7 +408,7 @@
             }
         };
 
-        let app = new PIXI.Application({ width: 800, height: 600, antialias: true });
+        let app = new PIXI.Application({ width: 800, height: 800, antialias: true });
         document.body.appendChild(app.view);
         app.renderer.backgroundColor = 0xffffff;
         // app.renderer.view.style.position = "absolute";
