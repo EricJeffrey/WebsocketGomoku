@@ -1,3 +1,6 @@
-pixi.js
-pixi.js.map
 foo.*
+
+back_up/pixi.*
+
+# Added by cargo
+**/target

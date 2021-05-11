@@ -1,6 +1,10 @@
 {
     "cSpell.words": [
-        "PIXI"
+        "Deque",
+        "PIXI",
+        "gomoku",
+        "nonblocking",
+        "unput"
     ],
     "todo-tree.filtering.excludeGlobs": [
         "**/pixi.js*"
